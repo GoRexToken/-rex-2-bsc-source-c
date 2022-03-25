@@ -1,4 +1,4 @@
-# rex-2-bsc-source
+# rex-2-bsc-source-c (CertiK)
 
 This document provides a quick overview about the contracts and tokens and their functionality.
 
