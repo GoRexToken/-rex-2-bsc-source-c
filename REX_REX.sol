@@ -912,13 +912,6 @@ abstract contract StakingToken is Snapshot {
                 _stakingDays
             );
 
-            // DEVELOPMENT CHECK
-            emit NewSharePrice(
-                newSharePrice,
-                globals.sharePrice,
-                1111111111
-            );
-
             if (newSharePrice > globals.sharePrice) {
 
                 newSharePrice =
@@ -948,8 +941,7 @@ abstract contract StakingToken is Snapshot {
         uint256 _bonusAmount = _getBonus(_stakingDays);
 
         return _tokenAmount
-            .mul(_bonusAmount)
-            .mul(1E8)
+            .mul( SHARES_PRECISION + _getBonus(_stakingDays) )
             .div(_stakeShares);
     }
 
