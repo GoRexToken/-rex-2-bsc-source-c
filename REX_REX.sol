@@ -938,8 +938,6 @@ abstract contract StakingToken is Snapshot {
         pure
         returns (uint256)
     {
-        uint256 _bonusAmount = _getBonus(_stakingDays);
-
         return _tokenAmount
             .mul( SHARES_PRECISION + _getBonus(_stakingDays) )
             .div(_stakeShares);
