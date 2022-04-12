@@ -817,7 +817,6 @@ abstract contract StakingToken is Snapshot {
         _stake.closeDay = _currentRxDay();                        // set closeDay
         ( , _stake.rewardAmount , ) =
             _checkRewardAmountbyID(msg.sender, _stakeID, 0);      // loop calculates rewards/day (for ALL days), reduced if late claim
-        _stake.rewardAmount += withdraws[msg.sender][_stakeID];   // add rewards that have already been fetched
         _stake.penaltyAmount = _calculatePenaltyAmount(_stake);   // penalty reduces principal payout, if ended before half of maturity
         _stake.isActive = 0;                                      // deactivate
 
