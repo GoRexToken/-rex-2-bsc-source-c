@@ -197,7 +197,7 @@ contract RexDailyAuction {
     IBEP20 public LP_TOKEN;
 
     IUniswapV2Router02 public constant UNISWAP_ROUTER = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-    address constant FACTORY = 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
+//    address constant FACTORY = 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
     address constant mrex_address = 0x76837D56D1105bb493CDDbEFeDDf136e7c34f0c4;
     address constant busd_address = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
     address constant MARKETING_ADDR = 0xe3551d48c6Dfb868255D3aF0Fb398365489025F3;
@@ -373,7 +373,7 @@ contract RexDailyAuction {
     )
         private
     {
-        require(_notContract(_referralAddress), 'REX: Invalid referral address.');
+        require(_notContract(_referralAddress) && msg.sender == tx.origin, 'REX: Invalid referral address.');
 
           // self referral: allow, but no bonus -> set to 0x0
         if (_senderAddress == _referralAddress) { _referralAddress = address(0x0); }
@@ -415,7 +415,7 @@ contract RexDailyAuction {
               // if referred: 10% of REX are reserved for referrer
             uint256 amountREX = _senderValue.div(10);
             _addReferralToDay(_referralAddress, _currentRxDay(), amountREX);
-            _trackReferrals(_referralAddress, _senderValue);                             // count uniqueReferrers
+            _trackReferrals(_referralAddress, amountREX);                             // count uniqueReferrers
 
               // if referred: claimable BUSD for referrer (1% of BUSD per MREX held by referrer), rest goes to treasury
             uint256 mrexRef = MREX_TOKEN.balanceOf(_referralAddress);
@@ -423,7 +423,7 @@ contract RexDailyAuction {
             referralBUSD[_referralAddress] = referralBUSD[_referralAddress].add( _senderValue.mul(mrexRef).div(100) );
             BUSDTREASURY = BUSDTREASURY.add( _senderValue.mul( uint256(5).sub(mrexRef) ).div(100) );  // 0-5 MREX => rest goes to treasury
 
-            emit ReferralAdded(_referralAddress, _senderAddress, _senderValue);
+            emit ReferralAdded(_referralAddress, _senderAddress, amountREX);
         }
         else
         {
@@ -1277,7 +1277,7 @@ contract RexDailyAuction {
       * @param token The token's address to withdraw (LP_TOKEN withdraws are forbidden)
       */
     function withdrawTokensAfterContractEnd(address token)
-        public
+        external
     {
         require(_currentRxDay() > LAST_CONTRACT_DAY, 'RDA: Too early.');
         require(msg.sender == GAS_REFUNDER, 'REX: Not allowed.');         // only the GAS_REFUNDER may withdraw tokens
