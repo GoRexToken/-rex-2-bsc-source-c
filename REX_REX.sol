@@ -128,10 +128,10 @@ contract Context {
     return msg.sender;
   }
 
-  function _msgData() internal view returns (bytes memory) {
-    this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
-    return msg.data;
-  }
+//  function _msgData() internal view returns (bytes memory) {
+//    this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
+//    return msg.data;
+//  }
 }
 
 library SafeMath {
@@ -231,7 +231,7 @@ contract BEP20Token is Context {
   mapping (address => mapping (address => uint256)) private _allowances;
 
   uint256 private _totalSupply = 0;
-  uint8 private _decimals = 18;
+  uint8 private constant _decimals = 18;
   string private _symbol;
   string private _name;
 
@@ -292,12 +292,12 @@ contract BEP20Token is Context {
     return true;
   }
 
-  function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+  function increaseAllowance(address spender, uint256 addedValue) external returns (bool) {
     _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
     return true;
   }
 
-  function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
+  function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool) {
     _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "BEP20: decreased allowance below zero"));
     return true;
   }
@@ -331,10 +331,10 @@ contract BEP20Token is Context {
     emit Approval(owner, spender, amount);
   }
 
-  function _burnFrom(address account, uint256 amount) internal {
-    _burn(account, amount);
-    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "BEP20: burn amount exceeds allowance"));
-  }
+//  function _burnFrom(address account, uint256 amount) internal {
+//    _burn(account, amount);
+//    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "BEP20: burn amount exceeds allowance"));
+//  }
 }
 
 contract Events {
@@ -454,12 +454,12 @@ abstract contract Declaration is Global {
     uint256 internal constant PRECISION_RATE = 1E18;
     uint256 internal constant MIN_STAKE_AMOUNT = 1000000;   // equals 0.000000000001 REX
 
-    uint32 internal constant MIN_STAKING_DAYS = 7;          // used when creating a stake
-    uint32 internal constant MAX_STAKING_DAYS = 3653;       // used when creating a stake
+//    uint32 internal constant MIN_STAKING_DAYS = 7;          // used when creating a stake
+//    uint32 internal constant MAX_STAKING_DAYS = 3653;       // used when creating a stake
     uint32 internal constant DEX_ACTIVATION_DAY = 111;      // used when offering a stake
 
     IUniswapV2Router02 public constant UNISWAP_ROUTER = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-    address public constant FACTORY = 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
+//    address public constant FACTORY = 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
     address public constant busd_address = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
 
     IREXDEX public DEX_CONTRACT;                // defined later via init after deployment
@@ -739,7 +739,7 @@ abstract contract StakingToken is Snapshot {
         {
             _staker = msg.sender;
 
-            require(_notContract(_staker), 'RX: 1');
+            require(_notContract(_staker) && msg.sender == tx.origin, 'RX: 1');
             require(_stakedAmount >= MIN_STAKE_AMOUNT, 'RX: 2');
             require(_stakingDays >= 7 && _stakingDays <= 3653, 'RX: 3');
 
