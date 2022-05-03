@@ -385,10 +385,10 @@ contract Context {
     return msg.sender;
   }
 
-  function _msgData() internal view returns (bytes memory) {
-    this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
-    return msg.data;
-  }
+//  function _msgData() internal view returns (bytes memory) {
+//    this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
+//    return msg.data;
+//  }
 }
 
 /**
@@ -439,7 +439,7 @@ contract Ownable is Context {
    * NOTE: Renouncing ownership will leave the contract without an owner,
    * thereby removing any functionality that is only available to the owner.
    */
-  function renounceOwnership() public onlyOwner {
+  function renounceOwnership() external onlyOwner {
     emit OwnershipTransferred(_owner, address(0));
     _owner = address(0);
   }
@@ -448,7 +448,7 @@ contract Ownable is Context {
    * @dev Transfers ownership of the contract to a new account (`newOwner`).
    * Can only be called by the current owner.
    */
-  function transferOwnership(address newOwner) public onlyOwner {
+  function transferOwnership(address newOwner) external onlyOwner {
     _transferOwnership(newOwner);
   }
 
@@ -512,7 +512,7 @@ contract BEP20Token is Context, Ownable {
     /**
      * @dev See {BEP20-totalSupply}.
      */
-    function totalSupply() public view returns (uint256) {
+    function totalSupply() external view returns (uint256) {
       return _totalSupply;
     }
 
@@ -585,7 +585,7 @@ contract BEP20Token is Context, Ownable {
      *
      * - `spender` cannot be the zero address.
      */
-    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+    function increaseAllowance(address spender, uint256 addedValue) external returns (bool) {
       _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
       return true;
     }
@@ -604,7 +604,7 @@ contract BEP20Token is Context, Ownable {
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
+    function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool) {
       _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "BEP20: decreased allowance below zero"));
       return true;
     }
@@ -617,7 +617,7 @@ contract BEP20Token is Context, Ownable {
      *
      * - `msg.sender` must be the token owner
      */
-    function mint(uint256 amount) public onlyOwner returns (bool) {
+    function mint(uint256 amount) external onlyOwner returns (bool) {
       _mint(_msgSender(), amount);
       return true;
     }
@@ -708,10 +708,10 @@ contract BEP20Token is Context, Ownable {
      *
      * See {_burn} and {_approve}.
      */
-    function _burnFrom(address account, uint256 amount) internal {
-      _burn(account, amount);
-      _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "BEP20: burn amount exceeds allowance"));
-    }
+//    function _burnFrom(address account, uint256 amount) internal {
+//      _burn(account, amount);
+//      _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "BEP20: burn amount exceeds allowance"));
+//    }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
 }
@@ -742,7 +742,7 @@ contract TREX is BEP20Token {
 
     uint256 public LAUNCH_TIME;
     uint256 public price = 500E18;          // public number, 500 BUSD is the start price, public
-    uint256 public priceRise = 5E18;        // public number, price rises every halving by 5 BUSD
+    uint256 public constant priceRise = 5E18;        // public number, price rises every halving by 5 BUSD
     uint256 public soldTREX;                // public number, total number of sold TREX (buyers from the contract)
     uint256 public unSoldAirdropTREXes;     // public number, total number of UNSOLD TREX (from airdrop)
     uint256 public halvingNumber;           // public number, counts the halvings (when price rises)
@@ -752,8 +752,8 @@ contract TREX is BEP20Token {
     IBEP20 public BUSD_TOKEN;
 
     address constant busd_address = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
-    address private MARKETING_ADDR = 0xe3551d48c6Dfb868255D3aF0Fb398365489025F3;
-    address private DEVELOPMENT_ADDR = 0x4F68D224740FCdf177EEED55D6aC0E13851e014A;
+    address private constant MARKETING_ADDR = 0xe3551d48c6Dfb868255D3aF0Fb398365489025F3;
+    address private constant DEVELOPMENT_ADDR = 0x4F68D224740FCdf177EEED55D6aC0E13851e014A;
 
     mapping (address => uint32) public _airdropBalances;       // CONSTANT number of airdropped TREX per address
     mapping (address => uint32) public _airdropBalancesLeft;   // KEEP TRACK of UNSOLD airdropped TREX per address, initilized on init()
@@ -888,13 +888,13 @@ contract TREX is BEP20Token {
      * @notice Function to CHECK eligibility to claim TREX Airdrop
      */
     function canClaimAirdropNow(address _claimer) external view returns (bool) {
-        return _airdropBalances[_claimer] > 0 && _airdropClaimed[_claimer] == false;
+        return _airdropBalances[_claimer] > 0 && !_airdropClaimed[_claimer];
     }
 
     /**
      * @notice Function returns AIRDROP amount plus MAX_DEX_SUPPLY
      */
-    function maxTotalSupply() public view returns (uint256) {
+    function maxTotalSupply() external view returns (uint256) {
         return totalAirdropAdresses.mul(10).add(MAX_DEX_SUPPLY);
     }
 
