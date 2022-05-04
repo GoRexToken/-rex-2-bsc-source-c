@@ -135,6 +135,10 @@ interface IREXToken {
         external view
         returns (IUniswapV2Pair);
 
+    function LAUNCH_TIME()
+        external view
+        returns (uint256);
+
     function balanceOf(
         address account
     ) external view returns (uint256);
@@ -560,6 +564,11 @@ contract RexDailyAuction {
             uint32 _lastCheckDay = _currentRxDay().sub(1);
 
             if (_firstCheckDay <= _lastCheckDay) {
+
+                // before allowing to generate supply, check if more than 1 hour has passed into the new day (new day = _firstCheckDay + 1 day)
+                bool hourPassed = ( block.timestamp.sub( uint256(_firstCheckDay).add(1).mul(86400 seconds).add(REX_CONTRACT.LAUNCH_TIME()) ) ) > 1 hours;
+                require (hourPassed, 'REX: Wait an hour');
+
                 _generateSupplyAndCheckPools(_firstCheckDay);
             }
         }
@@ -880,7 +889,7 @@ contract RexDailyAuction {
     )
         private
     {
-        addressBPDExcluded[msg.sender] = true;
+        addressBPDExcluded[_userAddress] = true;
 
         if(isBPDeligibleAddr(_userAddress))
         {
