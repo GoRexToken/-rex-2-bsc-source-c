@@ -892,13 +892,6 @@ contract TREX is BEP20Token {
     }
 
     /**
-     * @notice Function returns AIRDROP amount plus MAX_DEX_SUPPLY
-     */
-    function maxTotalSupply() external view returns (uint256) {
-        return totalAirdropAdresses.mul(10).add(MAX_DEX_SUPPLY);
-    }
-
-    /**
       * @notice Function to CLAIM TREX Airdrop,  mints the amount of TREX to the address
      */
     function claimAirdrop() external {
