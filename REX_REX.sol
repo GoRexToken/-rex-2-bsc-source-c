@@ -468,7 +468,7 @@ abstract contract Declaration is Global {
     IBEP20 public TREX_TOKEN;                   // defined later via init after deployment
 
     constructor() {
-        LAUNCH_TIME = 1645441200;               // DAY 0 :: 21.2.2022 11:00:00 GMT+0000, so day 1 = 22.2.22
+        LAUNCH_TIME = 1654250400;               // DAY 0 :: GMT: Friday, 3. June 2022 10:00:00
 }
 
     struct Stake {
