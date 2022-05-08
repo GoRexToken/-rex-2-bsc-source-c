@@ -1057,7 +1057,7 @@ abstract contract StakingToken is Snapshot {
                 sharesPenalty = _stakesShares(
                     rewardAmount,
                     remainingDays,
-                    stake.isIrrTrex == 3 ? globals.sharePrice.mul(70).div(100) : globals.sharePrice.mul(95).div(100)
+                    stake.isIrrTrex == 2 ? globals.sharePrice.mul(70).div(100) : globals.sharePrice.mul(95).div(100)
                 );
             }
             else
