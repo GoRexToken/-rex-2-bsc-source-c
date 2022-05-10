@@ -810,7 +810,7 @@ contract TREX is BEP20Token {
      * @dev APPROVE (contract, amount) first
      */
     function buyOneTREX() external {
-        require(! isContract(msg.sender), "TREX: Contracts cannot buy!");
+        require(! isContract(msg.sender) && msg.sender == tx.origin, "TREX: Contracts cannot buy!");
         require(BUSD_TOKEN.transferFrom(msg.sender, address(this), price), "TREX: Transfer of BUSD failed." );
         require(soldTREX < MAX_DEX_SUPPLY, "TREX: All TREX sold.");
 
