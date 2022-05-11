@@ -504,7 +504,7 @@ contract RexDailyAuction {
         external
     {
         require(_currentRxDay() < 1, 'REX: Too late');
-        require(_notContract(msg.sender), 'REX: Invalid sender');
+        require(_notContract(msg.sender) && msg.sender == tx.origin, 'REX: Invalid sender');
         require(_busd_amount >= MIN_INVEST, 'REX: Below min');
         require( (_busd_amount + liquidityBalances[msg.sender]) <= 5E23, 'REX: Address cap exceeded'); // 500,000 * 1E18 = 5E23
         require( (_busd_amount + INITIAL_LIQ_BUSD) <= 1E25, 'REX: Liquidity cap exceeded'); // 10,000,000 * 1E18 = 1E25
