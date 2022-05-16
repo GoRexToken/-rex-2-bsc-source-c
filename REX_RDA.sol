@@ -20,7 +20,7 @@ pragma solidity ^0.7.4;
  * GENERAL SHORT DESCRIPTION
  *
  * REX is the world's first extended STAKING token protocol.
- * It's a store of value designed to provide passive income.
+ * It is a store of value designed to provide passive income.
  * REX token and its functionality is described in the REX PAPER (whitepaper).
  *
  * This contract implements REX DAILY AUCTIONS and adds liquidity to PancakeSwap (INITIAL and DAILY).
@@ -30,8 +30,6 @@ pragma solidity ^0.7.4;
  * A participant is sending BUSD as a bid for a portion of the daily auction pool.
  * The minimum bid is 100 BUSD, th maximum is 50,000 (100,000 when holding TREX), only one bid per day.
  * The daily auctioned REX are then distributed amongst the days' participants in proportion to their investment percentage.
- *
- * The distribution routines are triggered by the first contract interaction on the NEXT REX DAY, using "supplyTrigger()"
  *
  * Auctioned REX must be actively claimed by the user (as liquid REX or as a REX stake).
  * When taking part in an auction and "claiming REX as a STAKE", the user is eligible for BigPayDays (paid in BUSD).
@@ -46,13 +44,12 @@ pragma solidity ^0.7.4;
  * "Random" number generation remark: The community has decided NOT to use oracles to create random numbers (due to safety).
  *
  * TREASURY:
- * All users, that are eligible for BigPayDays but never get one, WILL get BUSD from the TREASURY, when the auctions end
+ * All users, that are eligible for BigPayDays but never get one, shall get BUSD from the TREASURY, when the auctions end
  * They are tracked in "address[] private userAddressesBPD" (all BigPayDay addresses) and
  * also the contract knows whether the address is "addressHitByRandom" (= had a BigPayDay)
  * The donations of that address (BUSD sent to auctions) are saved in "sumOfDonationsOfUnHit" (used for ratio calculations):
  * When the TREASURY is opened, the addresses receive their portion of ALL BUSD in the contract at that time.
- * All unclaimed referralBUSD and randomBUSD must be claimed until LAST_CLAIM_DAY (day 250) or they are sent to BUSDTREASURY also.
- * The BUSDTREASURY is for all participants of auctions, that haven't had a Personal Random Big Pay Day.
+ * All unclaimed referralBUSD and randomBUSD must be claimed until LAST_CLAIM_DAY (day 250) or they are also sent to BUSDTREASURY.
  *
  * The contract has a referral system.
  * Referrers get 10% of the REX the referee gets, plus (when holding 1-5 MREX) 1-5% of the investor's BUSD ('referralBUSD')
@@ -60,11 +57,11 @@ pragma solidity ^0.7.4;
  * AUTOMATIC LIQUIDITY ADDING (to the REX-BUSD PancakeSwap pair)
  * 1) DAILY
  * This contract sends 10% of the daily received BUSD from auctions (and the corresponding amount of REX) to the pair
- * via calling ("_fillLiquidityPool(uint32 day)"). The LP tokens are burnt, so the liquidity can never be withdrawn from the pair.
+ * via calling ("_fillLiquidityPool()"). The LP tokens are burnt, so the liquidity can never be withdrawn from the pair.
  *
  * 2) INITIALLY (and maybe also DAILY):
  * Even before the auctions start on REX DAY 1, users may send BUSD to the contract using "sendLiquidityBUSD()"
- * (minimum invest per address: 100 BUSD, maximum per adress: 500,000 BUSD, 10,000,000 BUSD is the total maximum).
+ * (minimum invest per address: 100 BUSD, maximum per adress: 500,000 BUSD. 10,000,000 BUSD is the total maximum).
  * The total number of BUSD are saved in INITIAL_LIQ_BUSD. The BUSD are collected in the contract.
  * On the beginning of REX DAY 2, those BUSD (and the corresponding amount newly minted REX) are sent to the pair
  * As no REX have ever been sent to the pair before, this adding of liquidity sets the REX PRICE in the pair.
@@ -78,7 +75,7 @@ pragma solidity ^0.7.4;
  *
  * Overview: AUCTION ARRIVING BUSD - DISRIBUTION:
  * 75% of the sent BUSD are GIVEN BACK to the auction participants of auctions via 'BigPayDays'.
- * 10% of the sent BUSD are SENT to PancakeSwap as liquidity, irrevokable (LP tokens burnt, see "_fillLiquidityPool").
+ * 10% of the sent BUSD are SENT to PancakeSwap as liquidity, irrevokable (LP tokens burnt, see "_fillLiquidityPool()").
  * 5% are seperated: 1-5% are given back to referrers (if they hold MREX) and the rest (to 5%) is given back via the TREASURY.
  * 5% goes to a marketing fund
  * 5% goes to a development fund
@@ -93,6 +90,13 @@ pragma solidity ^0.7.4;
  *       251 =    all BUSD are moved to BUSDTREASURY
  *        252 <=         BUSDTREASURY claimable     <= 258
  *         259 = end of all pools, end of claiming REX from Donations and Referrals = "LAST_CONTRACT_DAY"
+ *
+ *
+ * PROCEDURE:
+ * The "supplyTrigger()" modifier is used in every external contract (write) call. The mechanics are:
+ *  1) Check for a new day has started (if so, calculate REX distribution from passt day(s) and calculate BigPayDays),
+ *  2) do whatever the caller wanted to do (claim tokens, send BUSD to auction,...)
+ *  3) Check if there is new Liquidity from auction participation to add to PCS (capped) or from INITIAL_LIQ_BUSD (capped)
  *
  * "ADMIN RIGHTS"
  * The deploying address "TOKEN_DEFINER" has only one right (and task to do):
@@ -112,6 +116,8 @@ pragma solidity ^0.7.4;
  * and wouldn’t be recoverable otherwise (which happens a lot). To grant full security, this
  * withdrawing ability explicitly excludes the REX-BUSD LP TOKENS that will wait in the contract
  * for initial liquidity providers even after the auction phase.
+ *
+ * Basic logic: Any external Tx will trigger the
  *
  */
 
@@ -134,10 +140,6 @@ interface IREXToken {
     function UNISWAP_PAIR()
         external view
         returns (IUniswapV2Pair);
-
-    function LAUNCH_TIME()
-        external view
-        returns (uint256);
 
     function balanceOf(
         address account
@@ -201,7 +203,6 @@ contract RexDailyAuction {
     IBEP20 public LP_TOKEN;
 
     IUniswapV2Router02 public constant UNISWAP_ROUTER = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-//    address constant FACTORY = 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
     address constant mrex_address = 0x76837D56D1105bb493CDDbEFeDDf136e7c34f0c4;
     address constant busd_address = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
     address constant MARKETING_ADDR = 0xe3551d48c6Dfb868255D3aF0Fb398365489025F3;
@@ -238,14 +239,13 @@ contract RexDailyAuction {
 
     Globals public g;
 
-    bool public poolWasntEmpty;   // used to decide whether users can create an extra BigPayDay
+    bool public poolWasntEmpty;   // used to decide whether users can create an extra BigPayDay (where empty means 5000 BUSD or less were left)
 
-    mapping(uint32 => uint256) public dailyBusdContributed;   // used for redistribution (REX)
-    mapping(uint32 => uint256) public dailyGeneratedREX;      // for calculating dailyRatio (REX)
-    mapping(uint32 => uint256) public dailyTotalDonation;     // for calculating dailyRatio (REX)
-    mapping(uint32 => uint256) public dailyTotalReferral;     // for calculating dailyRatio (REX)
-    mapping(uint32 => uint256) public dailyRatio;             // for calculating how many REX a BUSD gets (per day from auction investments)
-    uint32 public lastCheckedSupplyDay;                       // tracks successfully created past days of supply generation
+    mapping(uint32 => uint256) public dailyGeneratedREX;        // for calculating dailyRatio (REX)
+    mapping(uint32 => uint256) public dailyTotalDonation;       // for calculating dailyRatio (REX)
+    mapping(uint32 => uint256) public dailyTotalReferral;       // for calculating dailyRatio (REX)
+    mapping(uint32 => uint256) public dailyRatio;               // for calculating how many REX a BUSD gets (per day from auction investments)
+    uint32 public lastCheckedSupplyDay;                         // tracks successfully created past days of supply generation
 
     mapping(uint32 => uint256) public donatorAccountCount;                    // numberOfDonators per day
     mapping(address => mapping(uint32 => uint256)) public donatorBalances;    // address->day->amount
@@ -272,9 +272,11 @@ contract RexDailyAuction {
     mapping(address => uint256) public liquidityBalances;       // BUSD sent by early investors (for PCS initial liquidity)
     mapping(address => uint256) public liquidityBalancesDrawn;  // LP tokens withdrawn
     uint256 public INITIAL_LIQ_BUSD;      // total liquidity send by users before DAY 1 (to add to PancakeSwap, initially and daily)
-    uint256 public EXTRA_DAILY_LIQ;       // the amount of BUSD in INITIAL_LIQ_BUSD that is exceeding 100k divided by 200 is the amount to add daily
+    uint256 public EXTRA_DAILY_LIQ;       // the amount of BUSD in INITIAL_LIQ_BUSD that is exceeding 100k divided by 200
     uint256 public totalLpTokens;         // total No of LP tokens received (from PCS) after sending initial liquidity to PCS (after day 1)
 
+    uint256 public toSendToPairBusd;      // pool of BUSD (10% from AUCTION amounts) that shall be sent be sent to PCS
+    uint256 public extraLiqBusdSent;      // total number of BUSD that have been sent to PCS (from EXTRA_DAILY_LIQ)
     uint256 public BUSDPOOL;              // temporary pool of BUSD reserved for BPDs, unless distributed (to "randomBUSD[user]")
     uint256 public BUSDTREASURY;          // pool of BUSD for donators not hit by random, claim phase: days 252-258
     uint256 public treasuryRatio;         // 1E10 precision ratio, an unhit address gets from BUSDTREASURY
@@ -297,11 +299,12 @@ contract RexDailyAuction {
     event GasRefunded(address refundedAddress, uint256 refundedBNB);
 
     /**
-     * @notice Triggers the daily distribution routines
+     * @notice Triggers the daily distribution routines, checks for LIQUIDITY to add to the PCS PAIR
      */
     modifier supplyTrigger() {
         _dailyDistributionRoutine();
         _;
+        _fillLiquidityPool();
     }
 
     /**
@@ -354,6 +357,7 @@ contract RexDailyAuction {
     function donateBUSD(uint256 _busd_amount, address _referralAddress)
         external supplyTrigger
     {
+        require(_notContract(msg.sender) && msg.sender == tx.origin, 'REX: Invalid sender.');
         require(_currentRxDay() >= 1 && _currentRxDay() <= DONATION_DAYS, 'REX: Not in range.');
         require(donatorBalances[msg.sender][_currentRxDay()] == 0, 'REX: Already donated.');
         uint256 maxinvest = TREX_TOKEN.balanceOf(msg.sender) > 0 ? MAX_INVEST.mul(2) : MAX_INVEST; // TREX holders may donate 50% more
@@ -377,10 +381,8 @@ contract RexDailyAuction {
     )
         private
     {
-        require(_notContract(_referralAddress) && msg.sender == tx.origin, 'REX: Invalid referral address.');
-
-          // self referral: allow, but no bonus -> set to 0x0
-        if (_senderAddress == _referralAddress) { _referralAddress = address(0x0); }
+          // self referral: allow, but no bonus (or if _notContract) -> set to 0x0
+        if (_senderAddress == _referralAddress || _notContract(_referralAddress)) { _referralAddress = address(0x0); }
 
           // bonus: 10% more REX, if referrer provided
         uint256 _donationBalance = _referralAddress == address(0x0)
@@ -396,7 +398,7 @@ contract RexDailyAuction {
             _donationBalance = _donationBalance.add( _senderValue.mul( mrex.mul(2) ).div(100) );
         }
 
-          // this is for treasuryRatio calculation: add to the sum, if address hasn't been hit yet
+          // this is for treasuryRatio calculation: add to the sum, if address has not been hit yet
           // (the BigPayDay function subtracts, if an address is hit later, so the sum is always correct)
         if (!addressHitByRandom[_senderAddress]) {
             sumOfDonationsOfUnHit = sumOfDonationsOfUnHit.add(_senderValue);
@@ -406,11 +408,11 @@ contract RexDailyAuction {
         _trackDonators(_senderAddress, _donationBalance);             // count uniqueDonators
         originalDonation[_senderAddress] = originalDonation[_senderAddress].add(_senderValue);
         g.totalDonatedBUSD = g.totalDonatedBUSD.add(_senderValue);
-        dailyBusdContributed[_currentRxDay()] = dailyBusdContributed[_currentRxDay()].add(_senderValue);
 
-        BUSDPOOL = BUSDPOOL.add(_senderValue.mul(75).div(100));       // 75% for random BUSD BigPayDays
-        BUSD_TOKEN.transfer(MARKETING_ADDR, _senderValue.div(20));    // 5% go to marketing
-        BUSD_TOKEN.transfer(DEVELOPMENT_ADDR, _senderValue.div(20));  // 5% go to development
+        BUSDPOOL = BUSDPOOL.add(_senderValue.mul(75).div(100));         // 75% for random BUSD BigPayDays
+        toSendToPairBusd = toSendToPairBusd.add(_senderValue.div(10));  // amount of BUSD to send to the PCS PAIR
+        BUSD_TOKEN.transfer(MARKETING_ADDR, _senderValue.div(20));      // 5% go to marketing
+        BUSD_TOKEN.transfer(DEVELOPMENT_ADDR, _senderValue.div(20));    // 5% go to development
         // and 0-5% of BUSD go to the referrer, while 0-5% of BUSD of to TREASURY, so that ref + treasury = 5%
         // 10% of BUSD go to liquidity, once a day (triggered by dailyRoutine)
 
@@ -494,7 +496,7 @@ contract RexDailyAuction {
     }
 
     /** @notice A function to allow an investor to send BUSD into this contract, before auctions start
-      * @dev This doesn't use the "supplyTrigger", because it's before day 1 and would fail
+      * @dev This does not use the "supplyTrigger", because it is before day 1 and would fail
       * Those BUSD will be added REX later and both will be added to REX/BUSD pair (on PancakeSwap V2)
       * The LP tokens received after sending the liquidity, may be withdrawn (vested, after DONATION_DAYS)
       * The user must APPROVE this contract to spend the user's BUSD (front-end)
@@ -558,17 +560,14 @@ contract RexDailyAuction {
     function triggerDailyRoutineOneDay()
         external
     {
+        require(_notContract(msg.sender) && msg.sender == tx.origin, 'REX: No contracts');
+
         if (_currentRxDay() > 1)
         {
             uint32 _firstCheckDay = lastCheckedSupplyDay.add(1);
             uint32 _lastCheckDay = _currentRxDay().sub(1);
 
             if (_firstCheckDay <= _lastCheckDay) {
-
-                // before allowing to generate supply, check if more than 1 hour has passed into the new day (new day = _firstCheckDay + 1 day)
-                bool hourPassed = ( block.timestamp.sub( uint256(_firstCheckDay).add(1).mul(86400 seconds).add(REX_CONTRACT.LAUNCH_TIME()) ) ) > 1 hours;
-                require (hourPassed, 'REX: Wait an hour');
-
                 _generateSupplyAndCheckPools(_firstCheckDay);
             }
         }
@@ -617,13 +616,14 @@ contract RexDailyAuction {
         uint256 gasAtStart = gasleft();   // TRACK THE GAS - to refund gas to the calling address at the end of this function
 
           // Send initial liquidity (BUSD collected before REX DAY 1 + REX) to PancakeSwap pair
+          // A sandwich attack is not possible here, as no REX tokens exist at this moment
         if (_donationDay == 1) { _sendInitialLiquidityToPCS(); }
 
-          // Generate REX supply for auction days (days 1-DONATION_DAYS) and fill liquidity pool
+          // Generate REX supply for auction days (days 1-DONATION_DAYS)
         if (_donationDay >= 1 && _donationDay <= DONATION_DAYS)
-        { _generateSupply(_donationDay); _fillLiquidityPool(_donationDay); }
+        { _generateSupply(_donationDay); }
 
-          // if any investor that day, create BPD with up to 400 recipients
+          // if there is any investor that day, create BPD with up to 400 recipients
         if (_donationDay >= 2 && _donationDay < LAST_CLAIM_DAY && BUSDPOOL >= MIN_INVEST)
         { _createBPD(400); }
 
@@ -684,95 +684,132 @@ contract RexDailyAuction {
 
     }
 
-    /** @notice Fill the liquidity pool on Pancakeswap V2, after every auction day
+    /** @notice Fill the liquidity pool on Pancakeswap V2 (BUSD from INITIAL_LIQ_BUSD and AUCTIONS) starting REX DAY 2
+      * @dev Function is called at the end of "SupplyTrigger" routines, after _generateSupplyAndCheckPools
+      * MAX 1000 BUSD shall be added per Tx to prevent from sandwich attacks
       */
-    function _fillLiquidityPool(uint32 _donationDay)
+    function _fillLiquidityPool()
         private
     {
-        // STEP 1: add liquidity from auctions (if there is any)
-
-        if (dailyBusdContributed[_donationDay] >= MIN_INVEST)                       // only send liquidity if MIN_INVEST has come in
+        if (_currentRxDay() > 1 && _currentRxDay() <= 250)   // on DAY 251 all BUSD in the contract are moved to TREASURY
         {
-            (uint256 reserveIn, uint256 reserveOut, ) = UNISWAP_PAIR.getReserves(); // reserveIn SHOULD be REX, may be BUSD
-            uint256 _busdAmount = dailyBusdContributed[_donationDay].div(10);       // BUSD amount: 10% of the auction BUSD
-            uint256 _rexAmount;
+            uint256 totalAdd;   // to track that not more than 1000 BUSD are added in total
 
-            if (reserveIn == 0)   // if there are NO RESERVES yet, the start price hasn't been set before and has to be set NOW
+              // STEP 1: INITIAL_LIQ_BUSD: add extra liquidity (if any), capped at 500 BUSD
+              // triggered only between REX DAY 3 and 203 (= 201 days), but on REX DAY 203 only check for a remainder
+            if (EXTRA_DAILY_LIQ > 0 && _currentRxDay() >= 3 && _currentRxDay() <= 203)
             {
-                _rexAmount = _busdAmount.mul(INTIAL_REX_PRICE);
+                  // in case it is DAY 203 and the extraLiqBusdSent has not reached the FULL amount
+                  // or if it is before DAY 203 and the extraLiqBusdSent has not reached the DAILY amount: addLiquidity
+                if ( ( _currentRxDay() == 203 && extraLiqBusdSent < uint256(200).mul(EXTRA_DAILY_LIQ) ) ||
+                     ( _currentRxDay() < 203 && extraLiqBusdSent < uint256(_currentRxDay().sub(2)).mul(EXTRA_DAILY_LIQ)) )
+                {
+                        // "EXTRA_DAILY_LIQ > 0" means there must have been INITIAL_LIQ_BUSD and the reserves will already be > 0
+                    (uint256 reserveIn, uint256 reserveOut, ) = UNISWAP_PAIR.getReserves(); // reserveIn SHOULD be REX, may be BUSD
+
+                    uint256 _busdAmount;
+
+                    if (_currentRxDay() < 203)
+                    {
+                        _busdAmount = uint256(_currentRxDay().sub(2)).mul(EXTRA_DAILY_LIQ).sub(extraLiqBusdSent) > uint256(500E18)
+                            ? uint256(500E18)
+                            : uint256(_currentRxDay().sub(2)).mul(EXTRA_DAILY_LIQ).sub(extraLiqBusdSent);
+                    }
+                    else
+                    {
+                        _busdAmount = uint256(200).mul(EXTRA_DAILY_LIQ).sub(extraLiqBusdSent);
+                    }
+
+                    uint256 _rexAmount = UNISWAP_PAIR.token0() == busd_address  // CreatePair() sometimes sets wrong token order
+                        ? _busdAmount.mul(reserveOut).div(reserveIn)            // BUSD to token0, sometimes BUSD to token1 - so it
+                        : _busdAmount.mul(reserveIn).div(reserveOut);           // must be checked to get the correct ratio
+
+                    REX_CONTRACT.mintSupply(address(this), _rexAmount);
+                    REX_CONTRACT.approve(address(UNISWAP_ROUTER), _rexAmount);
+                    BUSD_TOKEN.approve(address(UNISWAP_ROUTER), _busdAmount);
+
+                    (
+                        uint256 amountREX,
+                        uint256 amountBUSD,
+                    ) =
+
+                    UNISWAP_ROUTER.addLiquidity(
+                      address(REX_CONTRACT),
+                      busd_address,
+                      _rexAmount,
+                      _busdAmount,
+                      0,
+                      0,
+                      address(this),
+                      block.timestamp.add(2 hours)
+                    );
+
+                    extraLiqBusdSent = extraLiqBusdSent.add(amountBUSD);  // update "extraLiqBusdSent" with amountBUSD (not _busdAmount)
+                    totalAdd = amountBUSD;                                // update the total sent amount until now
+                    totalLpTokens = LP_TOKEN.balanceOf(address(this));    // update the total LP token amount (for later withdrawal by investors)
+
+                    emit LiquidityGenerated(_currentRxDay(), amountBUSD, amountREX);
+                }
             }
-            else                  // if there ARE reserves, get the ratio - (reserveIn and reservwOut cannot be zero then)
+
+    // DEVELOPMENT
+    // what if the were BUSD left in the end - goes to treasury?
+    // how is it triggered after auction phase?
+
+
+              // STEP 2: add liquidity (BUSD received from AUCTIONS)
+              // capped at 500 BUSD (or up to 1000 if nothing has been sent in STEP 1 above)
+            if (toSendToPairBusd >= 500E18)
             {
-                _rexAmount = UNISWAP_PAIR.token0() == busd_address      // CreatePair() sometimes sets wrong token order
-                    ? _busdAmount.mul(reserveOut).div(reserveIn)        // BUSD to token0, sometimes BUSD to token1 - so it
-                    : _busdAmount.mul(reserveIn).div(reserveOut);       // must be checked to get the correct ratio
+                (uint256 reserveIn, uint256 reserveOut, ) = UNISWAP_PAIR.getReserves(); // reserveIn SHOULD be REX, may be BUSD
+
+                uint256 _busdAmount = toSendToPairBusd > uint256(1000E18).sub(totalAdd)
+                    ? uint256(1000E18).sub(totalAdd)
+                    : toSendToPairBusd;
+
+                uint256 _rexAmount;
+
+                if (reserveIn == 0)   // if there are NO RESERVES yet, the start price has not been set before and has to be set NOW
+                {
+                    _rexAmount = _busdAmount.mul(INTIAL_REX_PRICE);
+                }
+                else                  // if there ARE reserves, get the ratio - (reserveIn and reservwOut cannot be zero then)
+                {
+                    _rexAmount = UNISWAP_PAIR.token0() == busd_address      // CreatePair() sometimes sets wrong token order
+                        ? _busdAmount.mul(reserveOut).div(reserveIn)        // BUSD to token0, sometimes BUSD to token1 - so it
+                        : _busdAmount.mul(reserveIn).div(reserveOut);       // must be checked to get the correct ratio
+                }
+
+                REX_CONTRACT.mintSupply(address(this), _rexAmount);
+                REX_CONTRACT.approve(address(UNISWAP_ROUTER), _rexAmount);
+                BUSD_TOKEN.approve(address(UNISWAP_ROUTER), _busdAmount);
+
+                (
+                    uint256 amountREX,
+                    uint256 amountBUSD,
+                ) =
+
+                UNISWAP_ROUTER.addLiquidity(
+                  address(REX_CONTRACT),
+                  busd_address,
+                  _rexAmount,
+                  _busdAmount,
+                  0,
+                  0,
+                  address(0x0),
+                  block.timestamp.add(2 hours)
+                );
+
+                toSendToPairBusd = toSendToPairBusd.sub(amountBUSD);
+
+                emit LiquidityGenerated(_currentRxDay(), amountBUSD, amountREX);
             }
-
-            REX_CONTRACT.mintSupply(address(this), _rexAmount);
-            REX_CONTRACT.approve(address(UNISWAP_ROUTER), _rexAmount);
-            BUSD_TOKEN.approve(address(UNISWAP_ROUTER), _busdAmount);
-
-            (
-                uint256 amountREX,
-                uint256 amountBUSD,
-            ) =
-
-            UNISWAP_ROUTER.addLiquidity(
-              address(REX_CONTRACT),
-              busd_address,
-              _rexAmount,
-              _busdAmount,
-              0,
-              0,
-              address(0x0),
-              block.timestamp.add(2 hours)
-            );
-
-            emit LiquidityGenerated(_donationDay, amountBUSD, amountREX);
-        }
-
-        // STEP 2: add extra liquidity from initial liquidity phase (if any), between days 3 and 202 (200 days)
-
-        if (EXTRA_DAILY_LIQ > 0 && _donationDay >= 3 && _donationDay <= 202)
-        {
-            // if EXTRA_DAILY_LIQ > 0, there must have been INITIAL_LIQ_BUSD and the reserves will already be > 0
-
-            (uint256 reserveIn, uint256 reserveOut, ) = UNISWAP_PAIR.getReserves(); // reserveIn SHOULD be REX, may be BUSD
-
-            uint256 _busdAmount = EXTRA_DAILY_LIQ;
-            uint256 _rexAmount = UNISWAP_PAIR.token0() == busd_address  // CreatePair() sometimes sets wrong token order
-                ? _busdAmount.mul(reserveOut).div(reserveIn)            // BUSD to token0, sometimes BUSD to token1 - so it
-                : _busdAmount.mul(reserveIn).div(reserveOut);           // must be checked to get the correct ratio
-
-            REX_CONTRACT.mintSupply(address(this), _rexAmount);
-            REX_CONTRACT.approve(address(UNISWAP_ROUTER), _rexAmount);
-            BUSD_TOKEN.approve(address(UNISWAP_ROUTER), _busdAmount);
-
-            (
-                uint256 amountREX,
-                uint256 amountBUSD,
-            ) =
-
-            UNISWAP_ROUTER.addLiquidity(
-              address(REX_CONTRACT),
-              busd_address,
-              _rexAmount,
-              _busdAmount,
-              0,
-              0,
-              address(this),
-              block.timestamp.add(2 hours)
-            );
-
-            totalLpTokens = LP_TOKEN.balanceOf(address(this));   // update the total LP token amount (for later withdrawal by investors)
-
-            emit LiquidityGenerated(_donationDay, amountBUSD, amountREX);
         }
     }
 
     /** @notice Fill the liquidity pool on Pancakeswap V2 with initial liquidity, when day 1 has ended
       * THIS creates the start PRICE of the PancakeSwap REX-BUSD pair (if there is any liquidity to be added).
-      * This initial LP provision is capped to 100k BUSD. If it's more, it will be added daily to PCS (1/200 for 200 days)
+      * This initial LP provision is capped to 100k BUSD. If it is more, it will be added daily to PCS (1/200 for 200 days)
       * The LP tokens are sent to this contract, can be fetched by liquidity providers after auction phase.
       * (The REX needed to send to the PAIR are minted for FREE for the liquidity providers, based on the start price)
       */
@@ -897,6 +934,7 @@ contract RexDailyAuction {
             address addressToMove = userAddressesBPD[userAddressesBPD.length-1];
             userAddressesBPD[indexToDelete] = addressToMove;
             userIndicesBPD[addressToMove] = indexToDelete;
+            userIndicesBPD[_userAddress] = 0;
             userAddressesBPD.pop();
         }
     }
@@ -1024,7 +1062,7 @@ contract RexDailyAuction {
                 }
             }
             BUSDPOOL = busdPoolTemp;
-            poolWasntEmpty = BUSDPOOL > 5000E18;   // set a flag if more than 5000 BUSD left, so users CAN or CAN'T trigger BigPayDays manually
+            poolWasntEmpty = BUSDPOOL > 5000E18;   // set a flag if more than 5000 BUSD left, so users CAN or CANNOT trigger BigPayDays manually
             g.generatedBigPayDays++;
             emit DistributedBigPayDay(g.generatedBigPayDays, maxNumOfBPD, todaysNumOfBPD, busdPoolStart, BUSDPOOL);
         }
@@ -1134,6 +1172,7 @@ contract RexDailyAuction {
     {
         require(_currentRxDay() <= LAST_CLAIM_DAY, 'REX: Too late to claim');     // day 250 is last BUSD claiming day
         claimed = referralBUSD[msg.sender];                                       // get amount
+        require(claimed > 0, 'REX: No BUSD to to claim');                         // check for zero balance
         referralBUSD[msg.sender] = 0;                                             // reset to zero
         g.totalClaimedReferralBUSD = g.totalClaimedReferralBUSD.add(claimed);     // add to totalClaimed
         BUSD_TOKEN.transfer(msg.sender, claimed);                                 // move BUSD to Referrer
