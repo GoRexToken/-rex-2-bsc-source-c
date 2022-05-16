@@ -252,7 +252,7 @@ contract BEP20Token is Context {
     _symbol = tokenSymbol;
   }
 
-  function decimals() external view returns (uint8) {
+  function decimals() external pure returns (uint8) {
     return _decimals;
   }
 
@@ -491,6 +491,7 @@ abstract contract Declaration is Global {
     mapping(address => uint256) public totalREXinActiveStakes;
     mapping(address => mapping(bytes16 => Stake)) public stakes;
     mapping(address => mapping(bytes16 => uint256)) public withdraws;
+    mapping(address => mapping(bytes16 => uint256)) public initialShares;
     mapping(uint32 => uint256) public scheduledToEnd;
     mapping(uint32 => uint256) public totalPenalties;
 }
@@ -746,14 +747,14 @@ abstract contract StakingToken is Snapshot {
             _burn(_staker, _stakedAmount);
         }
 
-          // holding TREX gets 25% discount on SHARE price (results in 1/3 more SHARES)
+          // holding TREX gets 20% discount on SHARE price (results in 25% more SHARES)
         _newStake.stakesShares = (TREX_TOKEN.balanceOf(_staker) > 0)
-            ? _stakesShares(_stakedAmount, _stakingDays, globals.sharePrice.mul(75).div(100))
+            ? _stakesShares(_stakedAmount, _stakingDays, globals.sharePrice.mul(80).div(100))
             : _stakesShares(_stakedAmount, _stakingDays, globals.sharePrice);
 
         if (msg.sender == AIRDROP_CONTRACT || msg.sender == RDA_CONTRACT)
         {
-            _newStake.stakesShares = _newStake.stakesShares.mul(102).div(100); // stake is irrevocable, give 2% extra shares
+            _newStake.stakesShares = _newStake.stakesShares.mul(125).div(100); // stake is irrevocable, give 25% extra shares
             _newStake.isIrrTrex = TREX_TOKEN.balanceOf(_staker) > 0 ? uint8(3) : uint8(1); // 3=isIrrevocable && has Trex / 1=isIrrevocable && no Trex
             _newStake.description = msg.sender == AIRDROP_CONTRACT
                 ? unicode'🤴 AIRDROP'
@@ -765,9 +766,9 @@ abstract contract StakingToken is Snapshot {
 
             if (_irrevocable)
             {
-                  // adds an extra 2% OF SHARES
+                  // adds an extra 25% OF SHARES (also on the +25% for TREX)
+                _newStake.stakesShares = _newStake.stakesShares.mul(125).div(100);
                 _newStake.isIrrTrex = TREX_TOKEN.balanceOf(_staker) > 0 ? uint8(3) : uint8(1); // 3=isIrrevocable && has Trex / 1=isIrrevocable && no Trex
-                _newStake.stakesShares = _newStake.stakesShares.mul(102).div(100);
             }
             else
             {
@@ -779,6 +780,8 @@ abstract contract StakingToken is Snapshot {
 
         bytes16 stakeID = _generateStakeID(_staker);
         stakes[_staker][stakeID] = _newStake;
+
+        initialShares[_staker][stakeID] = _newStake.stakesShares;
 
         stakeCount[_staker] = stakeCount[_staker] + 1;
         _increaseGlobals(_newStake.stakedAmount, _newStake.stakesShares);
@@ -816,8 +819,8 @@ abstract contract StakingToken is Snapshot {
         Stake storage _stake = stakes[msg.sender][_stakeID];      // get stake
         _stake.closeDay = _currentRxDay();                        // set closeDay
         ( , _stake.rewardAmount , ) =
-            _checkRewardAmountbyID(msg.sender, _stakeID, 0);      // loop calculates rewards/day (for ALL days), reduced if late claim
-        _stake.penaltyAmount = _calculatePenaltyAmount(_stake);   // penalty reduces principal payout, if ended before half of maturity
+            _checkRewardAmountbyID(msg.sender, _stakeID, 0);      // loop calculates rewards/day (for ALL days), reduced if late claim, reduced if rewards withdrawn before
+        _stake.penaltyAmount = _calculatePenaltyAmount(_stake);   // penalty reduces principal payout, if ended before maturity
         _stake.isActive = 0;                                      // deactivate
 
           // keep track of the user's REX in active stakes
@@ -842,16 +845,28 @@ abstract contract StakingToken is Snapshot {
         _removeScheduledShares(_stake.finalDay, _stake.stakesShares);
 
           // distribute penalties to all stakers
-          // (if stake was ended earlier than 50% of its intended duration)
+          // (if stake was ended before maturity)
         if (_stake.penaltyAmount > 0) {
             totalPenalties[_stake.closeDay] = totalPenalties[_stake.closeDay].add(_stake.penaltyAmount);
+        }
+
+          // When calculating the SharePrice-Update, given bonuses (TREX/IRR) must be calculated backwards
+          // otherwise the SharePrice would rise more than needed
+          // also, use the initialShares of the stake, not the (possibly) deducted value in _stake.stakesShares
+
+        uint256 stakesSharesCorr = (_stake.isIrrTrex == 2 || _stake.isIrrTrex == 3)   // IF TREX, calculate back the TREX bonus
+            ? initialShares[msg.sender][_stakeID].mul(80).div(100)
+            : initialShares[msg.sender][_stakeID];
+
+        if (_stake.isIrrTrex == 1 || _stake.isIrrTrex == 3) {                         // IF IRREVOCABLE, calculate back the bonus
+            stakesSharesCorr = stakesSharesCorr.mul(80).div(100);
         }
 
         _sharePriceUpdate(
             _stake.stakedAmount > _stake.penaltyAmount ? _stake.stakedAmount - _stake.penaltyAmount : 0,
             _stake.rewardAmount + withdraws[msg.sender][_stakeID],
             _stake.stakingDays,
-            _stake.stakesShares
+            stakesSharesCorr
         );
 
         emit StakeEnded(
@@ -915,8 +930,8 @@ abstract contract StakingToken is Snapshot {
             if (newSharePrice > globals.sharePrice) {
 
                 newSharePrice =
-                    newSharePrice < globals.sharePrice.mul(102).div(100) ?
-                    newSharePrice : globals.sharePrice.mul(102).div(100);
+                    newSharePrice < globals.sharePrice.mul(105).div(100) ?
+                    newSharePrice : globals.sharePrice.mul(105).div(100);
 
                 emit NewSharePrice(
                     newSharePrice,
@@ -939,7 +954,9 @@ abstract contract StakingToken is Snapshot {
         returns (uint256)
     {
         return _tokenAmount
+            .mul(PRECISION_RATE)
             .mul( SHARES_PRECISION + _getBonus(_stakingDays) )
+            .div(SHARES_PRECISION)
             .div(_stakeShares);
     }
 
@@ -999,14 +1016,15 @@ abstract contract StakingToken is Snapshot {
     {
         Stake memory stake = stakes[_staker][_stakeID];
 
-        if (stake.isActive == 0) { return (0, stake.rewardAmount, 0); }         // ended stake - return saved rewardAmount
+        if (stake.isActive == 0) { return (0, stake.rewardAmount, 0); }        // ended stake - return saved rewardAmount
         if (stake.startDay > _currentRxDay()) { return (0, 0, 0); }            // stake not started - return 0
         if (stake.isActive == 3 || stake.isActive == 4) { return (0, 0, 0); }  // stake transferred or sold - return 0
 
         if (_currentRxDay() >= stake.finalDay)
         {
-            // the stake is ACTIVE (or still OFFERED on DEX) and mature - calculate rewards for ALL past days and deduct LATE penalty on rewards (if applicable)
-            // Withdrawing rewards is not possible, so there no penalties for shares
+            // the stake is ACTIVE (or still OFFERED on DEX) and MATURE - calculate rewards for ALL past days and deduct LATE penalty on rewards (if applicable)
+            // Withdrawing rewards is not possible at this point, so there are no penalties for shares
+            // if rewards have been withdrawn before, this is regarded by using _startingDay(stake)
 
             uint32 _finalDay = _calculationDay(stake);
 
@@ -1016,7 +1034,7 @@ abstract contract StakingToken is Snapshot {
                 _finalDay
             );
 
-              // LATE CLAIM: deduct penalty of 1%/week, if claimed more than 14 days after finalDay
+              // LATE CLAIM: deduct REWARDS penalty of 1%/week, if claimed more than 14 days after finalDay
             if (_currentRxDay() > (_finalDay + uint32(14)) && rewardAmount > 0) {
                 uint256 _reductionPercent = ((uint256(_currentRxDay()) - uint256(_finalDay) - uint256(14)) / uint256(7)) + uint256(1);
                 if (_reductionPercent > 100) { _reductionPercent = 100; }
@@ -1028,7 +1046,7 @@ abstract contract StakingToken is Snapshot {
         }
         else
         {
-            // by now, the stake must be ACTIVE or OFFERED on DEX, already started and not mature:
+            // now, the stake must be ACTIVE or OFFERED on DEX, already started and not mature:
             // calculate the withdrawable rewardAmount and the sharesPenalty that would be deducted
 
             _withdrawDay = _withdrawDays > 0               // startingDay returns stake.startDay OR stake.withdrawDay (if withdrawn already)
@@ -1051,13 +1069,15 @@ abstract contract StakingToken is Snapshot {
             );
 
               // calculate penalty - shares that would be deducted (if there are any rewards)
+              // this part is only for REVOCABLE STAKES when rewards are being withdrawn
+              // deduct the shares, that the user would get, when creating a new stake for the remaining days (@ current SharePrice)
+
             if (rewardAmount > 0)
             {
-                uint32 remainingDays = _daysLeft(stake);
                 sharesPenalty = _stakesShares(
                     rewardAmount,
-                    remainingDays,
-                    stake.isIrrTrex == 2 ? globals.sharePrice.mul(70).div(100) : globals.sharePrice.mul(95).div(100)
+                    _daysLeft(stake),
+                    stake.isIrrTrex == 2 ? globals.sharePrice.mul(80).div(100) : globals.sharePrice
                 );
             }
             else
@@ -1086,7 +1106,8 @@ abstract contract StakingToken is Snapshot {
 
     /**
     * @notice A private function used to calculate penalties on a REX PRINCIPAL for ACTIVE STAKES and OFFERED STAKES
-    * If stake is served 50%: no penalty, otherwise linear from 100% (day 1) to 0% (day x/2 of x)
+    * If stake has not started or fully served, no penalty => (_stakeNotStarted(_stake) || _daysLeft(_stake) == 0)
+    * Otherwise linear from day 1 (90% penalty) to last day before maturity (10% penalty)
     * @param _stake unique bytes sequence reference to the stake
     */
     function _calculatePenaltyAmount(
@@ -1096,11 +1117,8 @@ abstract contract StakingToken is Snapshot {
         view
         returns (uint256)
     {
-        return _stakeNotStarted(_stake) ? 0 : (
-            ((_stake.stakingDays - _daysLeft(_stake)) >= (_stake.stakingDays / 2)) ? 0 : (
-                _stake.stakedAmount - ( ( _stake.stakedAmount * (_stake.stakingDays - _daysLeft(_stake)) ) / (_stake.stakingDays / 2) )
-            )
-        );
+        return ( _stakeNotStarted(_stake) || _daysLeft(_stake) == 0 ) ? 0 :
+            ( _stake.stakedAmount * (100 + (800 * (_daysLeft(_stake) - 1) / (_stake.stakingDays - 1) ) ) / 1000 );
     }
 
     function _loopRewardAmount(
@@ -1251,7 +1269,7 @@ abstract contract ExtendedStaking is StakingToken {
     /**
     * @notice allows to withdraw staking rewards from active stake
     * @param _stakeID unique bytes sequence reference to the stake
-    * @param _withdrawDays amount of days to process, all = 0
+    * @param _withdrawDays number of days to process (from the beginning / last withdraw day), all possible days = 0
     */
     function withdrawRewards(
         bytes16 _stakeID,
@@ -1266,9 +1284,10 @@ abstract contract ExtendedStaking is StakingToken {
     {
         _dailySnapshotPoint(_currentRxDay());
 
-        require(stakes[msg.sender][_stakeID].isActive == 1, 'RX: 16');               // only if stake is active
-        require(stakes[msg.sender][_stakeID].finalDay > _currentRxDay(), 'RX: 17');  // only if stake is immature
+        require(stakes[msg.sender][_stakeID].isActive == 1, 'RX: 16');                // only if stake is active
         require(stakes[msg.sender][_stakeID].isIrrTrex == 0 || stakes[msg.sender][_stakeID].isIrrTrex == 2, 'RX: 18'); // not possible for irrevocable stakes
+        require(_currentRxDay() > stakes[msg.sender][_stakeID].startDay, 'RX: 17');   // stake must have passed the first active day, or there are no rewards to withdraw
+        require(stakes[msg.sender][_stakeID].finalDay > _currentRxDay(), 'RX: 17a');  // only if stake is immature
 
         Stake memory stake = stakes[msg.sender][_stakeID];  // get stake
 
@@ -1282,21 +1301,9 @@ abstract contract ExtendedStaking is StakingToken {
             stake.stakesShares > stakersPenalty ?
             stake.stakesShares.sub(stakersPenalty) : 0;
 
-          // keep track of the scheduled shares: deduct from final day
-        _removeScheduledShares(
-            stake.finalDay,
-            stakersPenalty > _sharesTemp ? _sharesTemp : stakersPenalty
-        );
-
-          // log globals
+          // keep track of the scheduled shares: deduct from final day - then log globals
+        _removeScheduledShares(stake.finalDay, stakersPenalty > _sharesTemp ? _sharesTemp : stakersPenalty);
         _decreaseGlobals(0, _sharesTemp > stakersPenalty ? stakersPenalty : _sharesTemp);
-
-        _sharePriceUpdate(
-            stake.stakedAmount,
-            withdrawAmount,
-            stake.stakingDays,
-            stake.stakesShares
-        );
 
           // keep track of withdraws for sharePriceUpdate when calling _endStake
         withdraws[msg.sender][_stakeID] = withdraws[msg.sender][_stakeID].add(withdrawAmount);
