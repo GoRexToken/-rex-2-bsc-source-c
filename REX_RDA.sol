@@ -381,8 +381,8 @@ contract RexDailyAuction {
     )
         private
     {
-          // self referral: allow, but no bonus (or if _notContract) -> set to 0x0
-        if (_senderAddress == _referralAddress || _notContract(_referralAddress)) { _referralAddress = address(0x0); }
+          // self referral: allow, but no bonus (or if !_notContract) -> set to 0x0
+        if (_senderAddress == _referralAddress || !_notContract(_referralAddress)) { _referralAddress = address(0x0); }
 
           // bonus: 10% more REX, if referrer provided
         uint256 _donationBalance = _referralAddress == address(0x0)
