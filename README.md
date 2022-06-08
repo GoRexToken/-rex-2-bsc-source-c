@@ -1,6 +1,11 @@
-# rex-2-bsc-source-c (CertiK)
+# rex-2-bsc-source-c (CertiK and Solidity.Finance)
 
 This document provides a quick overview about the contracts and tokens and their functionality.
+
+# LATEST CHANGES 
+AUCTIONS / RDA contract:
+_fillLiquidityPool() has been added a check for small values when addingLiquidity: "if (_busdAmount >= 1E18)"
+to prevent from the contract failing to addLiquidity to PancakeSwap (remainder values like trying to add 0.000000000000000001 BUSD)
 
 ****
 
@@ -14,10 +19,6 @@ Devs contact person: Thomas Rexroth
 + E-mail: go@rex-token.com
 
 ****
-
-# Description / Contracts
-
-REX is a set of 6 smart contracts, made to run on BinanceSmartChain.
 
 # Project Description / CONTRACTS
 REX is a set of 6 smart contracts, made to run on Smart Chain (BSC).
@@ -76,6 +77,7 @@ https://bscscan.com/address/0x76837d56d1105bb493cddbefeddf136e7c34f0c4
 
 ****
 
+
 # Compiler
 We have compiled with
 
@@ -83,15 +85,15 @@ npx oz compile --optimizer on --optimizer-runs 1 --evm-version istanbul
 
 
 # Website Concept
-People use the MAIN WEBSITE (linked on twitter.com/rex-token) to
+People use the MAIN WEBSITE (rex.io) to
 * Learn about cryptocurrencies, staking, staking strategies, decentralized finance (DeFi) and REX
-* Take part in 222 daily AUCTIONS (contract: REX_RDA.sol. They send BUSD and receive liquid or staked REX on the next day.
+* Take part in 222 daily AUCTIONS (contract: REX_RDA.sol. They send BUSD and receive liquid or staked REX on the next day.)
 * Claim BUSD from Personal Random BigPayDays (after taking part in AUCTIONS).
 * Claim referral rewards, REX and BUSD.
-* Buy REX via PancakeSwap interface.
+* Buy REX via PancakeSwap (or rex.io interface).
 * STAKE their REX (REX are burnt, SHARES are created. SHARES earn INTEREST for every staked day.)
-* Buy and sell REX STAKES via integrated DEX contract
-* Buy and use TREX and MREX tokens for unlocking REX functionalties, see the REX paper
+* Buy and sell REX STAKES via integrated DEX contract.
+* Buy and use TREX (more SHARES in a REX stake, higher limits in auctions,...) and MREX (more REX from auctions and referrals, no fees on DEX,...)
 * Claim REX airdrop (liquid or staked REX), if the are in the REX CLASSIC snapshop
 
 
