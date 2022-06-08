@@ -3,9 +3,14 @@
 This document provides a quick overview about the contracts and tokens and their functionality.
 
 # LATEST CHANGES 
+
+1.
 AUCTIONS / RDA contract:
 _fillLiquidityPool() has been added a check for small values when addingLiquidity: "if (_busdAmount >= 1E18)"
 to prevent from the contract failing to addLiquidity to PancakeSwap (remainder values like trying to add 0.000000000000000001 BUSD)
+
+2.
+Updated the comments sections in the beginning of the contracts
 
 ****
 
