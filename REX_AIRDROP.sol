@@ -150,7 +150,7 @@ contract RexAirdrop {
     /** @notice Allows to CHECK if an address might claim airdrop now
       */
     function addressCanClaimNow(address _claimer)
-        public
+        external
         view
         returns (bool)
     {
@@ -163,7 +163,7 @@ contract RexAirdrop {
     /** @notice Allows to CHECK if an address might claim and stake airdrop now
       */
     function addressCanStakeNow(address _check)
-        public
+        external
         view
         returns (bool)
     {
