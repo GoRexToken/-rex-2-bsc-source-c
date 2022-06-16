@@ -110,9 +110,9 @@ contract RexDEX {
     IBEP20 public BUSD_TOKEN;
     IBEP20 public MREX_TOKEN;
 
-    address private busd_address = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
-    address private MARKETING_ADDR = 0xe3551d48c6Dfb868255D3aF0Fb398365489025F3;
-    address private DEVELOPMENT_ADDR = 0x4F68D224740FCdf177EEED55D6aC0E13851e014A;
+    address private constant busd_address = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
+    address private constant MARKETING_ADDR = 0x781A97D39Cb6dDb9212fcaB3AEF8d63bD0A6fEbD;
+    address private constant DEVELOPMENT_ADDR = 0x4611f8621C8f7B8Cfa97A2101d1c2B41d65aE994;
     address constant mrex_address = 0x76837D56D1105bb493CDDbEFeDDf136e7c34f0c4;
 
     uint256 public noOfOffers;
@@ -178,7 +178,7 @@ contract RexDEX {
     )
         external
     {
-        require(msg.sender == address(REX_CONTRACT), "DEX: Can only be called by DEX contract.");
+        require(msg.sender == address(REX_CONTRACT), "DEX: Can only be called by REX contract.");
 
         uint256 _ID = noOfOffers;
         noOfOffers = noOfOffers.add(1);
@@ -201,8 +201,8 @@ contract RexDEX {
 
 
     /**
-     * @notice Function to buy a STAKE using BUSD
-     * @dev APPROVE (contract, amount) first! - PRICE + plus 5 BUSD fee + (if !MREX holder:) offerPrice*0.01 (BUSD) for service
+     * @notice Function for a user (not a contract) to buy a STAKE using BUSD
+     * @dev APPROVE (contract, amount) first! -> PRICE + (if !MREX holder:) offerPrice*0.01 (BUSD) for service
      * @param _offerID of the STAKE
      */
     function buyStakeFromList(
@@ -213,8 +213,8 @@ contract RexDEX {
         StakeOffer storage _offer = stakeOffers[_offerID];
 
         require(_offer.staker != msg.sender, "DEX: Cannot buy your own stake.");
-        require(_offer.isActive == true, "DEX: Offer not active.");
-        require(_notContract(msg.sender), 'DEX: Buyer not an address');
+        require(_offer.isActive, "DEX: Offer not active.");
+        require(_notContract(msg.sender) && msg.sender == tx.origin, 'DEX: Buyer not an address');
 
         bool _notExpired = _currentRxDay() <= ( _offer.offerStartDay.add(_offer.offerDurationDays) );
         require(_notExpired, "DEX: Offer has expired.");
@@ -249,7 +249,7 @@ contract RexDEX {
         StakeOffer storage _offer = stakeOffers[_offerID];
 
         require(_offer.staker == msg.sender, "DEX: Only stake owner");
-        require(_offer.isActive == true, "DEX: Cannot revoke");
+        require(_offer.isActive, "DEX: Cannot revoke");
 
         _offer.isActive = false;
 
