@@ -42,7 +42,7 @@ A user may sell and buy STAKES on an NATIVE (integrated) decentralized exchange 
 This makes REX a most powerful and flexible ecosystem for decentralized value transfers,
 a "world's first" in DeFi. Unleashing staking.
 
-Find the ::REXpaper:: for more information.
+Find the REXpaper for more information: rex.io/paper
 
 */
 
@@ -68,14 +68,33 @@ Find the ::REXpaper:: for more information.
  * The amount of shares and rewards a user recieves for their stake depends upon the staker’s staked amount of REX,
  * the total amount staked by all users, the start date of the stake, and the end date of the stake.
  * When ending a stake, REX are minted back to the user (plus rewards minus penalties).
- * The token supply inflates at 12.9% per year.
+ * The token supply inflates at 12.9% per year. (This may be higher if penalties occur, when users early end stakes.)
  * This inflation is distributed to the STAKERS, in proportion to their SHARES.
  * Longer pays better: When opening a stake, the longer the stake, the more SHARES it gets (slightly exponential).
  * The amount of SHARES also depends on the SHARE PRICE, initially 0.1 = The user receives 10 SHARES/REX.
  * The SHARE PRICES only rises over the time.
  * Penalties may be incurred by stakers who early unstake or who fail to claim their rewards in a timely manner.
- * TREX holders get 33.33% more SHARES when opening a stake (via a 25% discount on the SharePrice).
- * Making a stake "irrevocable" adds 2% more SHARES when opening a stake.
+ * TREX holders get 25% more SHARES when opening a stake (via a 20% discount on the SharePrice).
+ * Making a stake "irrevocable" adds 25% more SHARES when opening a stake.
+ *
+ * DEX: Built-in Decentralized Exchange for active REX STAKES
+ * REX provides its own native decentralized exchange ("DEX") for stakes, where users may offer their stakes for sale.
+ * This is implemented in the linked DEX contract.
+ * When offering a stake, the user must set a desired BUSD price (5 BUSD minimum) and an offer duration from 1 to 30 days,
+ * where the scheduled end of the offer must be before the stake’s maturity date.
+ * Offering a stake will list the stake on the DEX (in the DEX contract) and set the offered stake inactive,
+ * so the user can’t transfer, rename, end or split the stake, nor withdraw staking rewards during the time of the offering.
+ * The offered stake will be buyable by other users until the offer has expired or the user has revoked it.
+ * A stake offer may be revoked by the seller anytime within the offer duration, unless a buyer has bought it.
+ * Successfully buying a stake creates for the buyer a new active stake with the exact properties of the offered stake,
+ * with the description set to "Bought on DEX" and closes the offered stake of the seller.
+ * If the offered stake isn’t sold before expiry, the seller must actively revoke the offer to restore
+ * the original name of the stake and reactivate it.
+ * A stake must have fulfilled at least 10% of the staking duration to be offered.
+ * Stake offers may be submitted from REX DAY 111 (DEX activation day).
+ * Stakes that have any of their staking rewards withdrawn can’t be offered.
+ * Buying a stake incurs a fee of 2% of the stake’s BUSD price for the buyer.
+ * Fee usage: 1% goes to MARKETING FUND and 1% goes to DEV FUND.
  *
  * "ADMIN RIGHTS"
  * The deploying address "TOKEN_DEFINER" has only one right:
@@ -113,7 +132,6 @@ interface IUniswapV2Router02 {
 }
 
 interface IREXDEX {
-
     function listStake(
         address staker,
         uint32 offerStartDay,
@@ -126,11 +144,6 @@ interface IREXDEX {
 contract Context {
   function _msgSender() internal view returns (address payable) {
     return msg.sender;
-  }
-
-  function _msgData() internal view returns (bytes memory) {
-    this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
-    return msg.data;
   }
 }
 
@@ -231,7 +244,7 @@ contract BEP20Token is Context {
   mapping (address => mapping (address => uint256)) private _allowances;
 
   uint256 private _totalSupply = 0;
-  uint8 private _decimals = 18;
+  uint8 private constant _decimals = 18;
   string private _symbol;
   string private _name;
 
@@ -252,7 +265,7 @@ contract BEP20Token is Context {
     _symbol = tokenSymbol;
   }
 
-  function decimals() external view returns (uint8) {
+  function decimals() external pure returns (uint8) {
     return _decimals;
   }
 
@@ -292,12 +305,12 @@ contract BEP20Token is Context {
     return true;
   }
 
-  function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+  function increaseAllowance(address spender, uint256 addedValue) external returns (bool) {
     _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
     return true;
   }
 
-  function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
+  function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool) {
     _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "BEP20: decreased allowance below zero"));
     return true;
   }
@@ -329,11 +342,6 @@ contract BEP20Token is Context {
     require(spender != address(0), "BEP20: approve to 0x0");
     _allowances[owner][spender] = amount;
     emit Approval(owner, spender, amount);
-  }
-
-  function _burnFrom(address account, uint256 amount) internal {
-    _burn(account, amount);
-    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "BEP20: burn amount exceeds allowance"));
   }
 }
 
@@ -454,22 +462,19 @@ abstract contract Declaration is Global {
     uint256 internal constant PRECISION_RATE = 1E18;
     uint256 internal constant MIN_STAKE_AMOUNT = 1000000;   // equals 0.000000000001 REX
 
-    uint32 internal constant MIN_STAKING_DAYS = 7;          // used when creating a stake
-    uint32 internal constant MAX_STAKING_DAYS = 3653;       // used when creating a stake
     uint32 internal constant DEX_ACTIVATION_DAY = 111;      // used when offering a stake
 
-    IUniswapV2Router02 public constant UNISWAP_ROUTER = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-    address public constant FACTORY = 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
     address public constant busd_address = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
-
-    IREXDEX public DEX_CONTRACT;                // defined later via init after deployment
     address public RDA_CONTRACT;                // defined later via init after deployment
     address public AIRDROP_CONTRACT;            // defined later via init after deployment
+
+    IUniswapV2Router02 public constant UNISWAP_ROUTER = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
     IBEP20 public TREX_TOKEN;                   // defined later via init after deployment
+    IREXDEX public DEX_CONTRACT;                // defined later via init after deployment
 
     constructor() {
-        LAUNCH_TIME = 1645441200;               // DAY 0 :: 21.2.2022 11:00:00 GMT+0000, so day 1 = 22.2.22
-}
+        LAUNCH_TIME = 1656608400;               // DAY 0 :: Thu Jun 30 2022 17:00:00 GMT+0000 (AUCTIONS start 1 day later at 1656694800)
+    }
 
     struct Stake {
         uint256 stakesShares;
@@ -491,6 +496,7 @@ abstract contract Declaration is Global {
     mapping(address => uint256) public totalREXinActiveStakes;
     mapping(address => mapping(bytes16 => Stake)) public stakes;
     mapping(address => mapping(bytes16 => uint256)) public withdraws;
+    mapping(address => mapping(bytes16 => uint256)) public initialShares;
     mapping(uint32 => uint256) public scheduledToEnd;
     mapping(uint32 => uint256) public totalPenalties;
 }
@@ -609,6 +615,8 @@ abstract contract Snapshot is Helper {
     function manualSnapshotOneDay()
         external
     {
+        require(_notContract(msg.sender) && msg.sender == tx.origin, 'REX: Not an address');
+
         if (currentRxDay() >= 2) {                                    // do nothing on days 0 and 1 where nothing happens
             if (currentRxDay() > globals.currentRxDay + 1) {          // snapshot needed? (difference between actual and update day > 2)
                 _dailySnapshotPoint(globals.currentRxDay + 1); } }    // update only the first day after last snapshot day
@@ -703,8 +711,8 @@ abstract contract StakingToken is Snapshot {
     }
 
     /**
-     * @notice A function for a staker to create a stake, also used by above batch function
-     * also used by contracts: AIRDROP and AUCTION (RDA)
+     * @notice A function for a staker (not a contract) to create a stake, also used by above batch function
+     * but also used by allowed contracts: AIRDROP and AUCTION (RDA)
      * @param _stakerAdd Address of staker            - ONLY used if called by AIRDROP or AUCTION
      * @param _stakedAmount Amount of REX staked
      * @param _stakingDays Number of days it is locked
@@ -739,21 +747,21 @@ abstract contract StakingToken is Snapshot {
         {
             _staker = msg.sender;
 
-            require(_notContract(_staker), 'RX: 1');
+            require(_notContract(_staker) && msg.sender == tx.origin, 'RX: 1');
             require(_stakedAmount >= MIN_STAKE_AMOUNT, 'RX: 2');
             require(_stakingDays >= 7 && _stakingDays <= 3653, 'RX: 3');
 
             _burn(_staker, _stakedAmount);
         }
 
-          // holding TREX gets 25% discount on SHARE price (results in 1/3 more SHARES)
+          // holding TREX gets 20% discount on SHARE price (results in 25% more SHARES)
         _newStake.stakesShares = (TREX_TOKEN.balanceOf(_staker) > 0)
-            ? _stakesShares(_stakedAmount, _stakingDays, globals.sharePrice.mul(75).div(100))
+            ? _stakesShares(_stakedAmount, _stakingDays, globals.sharePrice.mul(80).div(100))
             : _stakesShares(_stakedAmount, _stakingDays, globals.sharePrice);
 
         if (msg.sender == AIRDROP_CONTRACT || msg.sender == RDA_CONTRACT)
         {
-            _newStake.stakesShares = _newStake.stakesShares.mul(102).div(100); // stake is irrevocable, give 2% extra shares
+            _newStake.stakesShares = _newStake.stakesShares.mul(125).div(100); // stake is irrevocable, give 25% extra shares
             _newStake.isIrrTrex = TREX_TOKEN.balanceOf(_staker) > 0 ? uint8(3) : uint8(1); // 3=isIrrevocable && has Trex / 1=isIrrevocable && no Trex
             _newStake.description = msg.sender == AIRDROP_CONTRACT
                 ? unicode'🤴 AIRDROP'
@@ -765,9 +773,9 @@ abstract contract StakingToken is Snapshot {
 
             if (_irrevocable)
             {
-                  // adds an extra 2% OF SHARES
+                  // adds an extra 25% OF SHARES (also on the +25% for TREX)
+                _newStake.stakesShares = _newStake.stakesShares.mul(125).div(100);
                 _newStake.isIrrTrex = TREX_TOKEN.balanceOf(_staker) > 0 ? uint8(3) : uint8(1); // 3=isIrrevocable && has Trex / 1=isIrrevocable && no Trex
-                _newStake.stakesShares = _newStake.stakesShares.mul(102).div(100);
             }
             else
             {
@@ -779,6 +787,8 @@ abstract contract StakingToken is Snapshot {
 
         bytes16 stakeID = _generateStakeID(_staker);
         stakes[_staker][stakeID] = _newStake;
+
+        initialShares[_staker][stakeID] = _newStake.stakesShares;
 
         stakeCount[_staker] = stakeCount[_staker] + 1;
         _increaseGlobals(_newStake.stakedAmount, _newStake.stakesShares);
@@ -795,7 +805,7 @@ abstract contract StakingToken is Snapshot {
     }
 
     /**
-    * @notice A function for a staker to end (or early end) a stake
+    * @notice A function for a staker (not a contract) to end (or early end) a stake
     * @param _stakeID unique bytes sequence reference to the stake
     */
     function endStake(
@@ -816,8 +826,8 @@ abstract contract StakingToken is Snapshot {
         Stake storage _stake = stakes[msg.sender][_stakeID];      // get stake
         _stake.closeDay = _currentRxDay();                        // set closeDay
         ( , _stake.rewardAmount , ) =
-            _checkRewardAmountbyID(msg.sender, _stakeID, 0);      // loop calculates rewards/day (for ALL days), reduced if late claim
-        _stake.penaltyAmount = _calculatePenaltyAmount(_stake);   // penalty reduces principal payout, if ended before half of maturity
+            _checkRewardAmountbyID(msg.sender, _stakeID, 0);      // loop calculates rewards/day (for ALL days), reduced if late claim, reduced if rewards withdrawn before
+        _stake.penaltyAmount = _calculatePenaltyAmount(_stake);   // penalty reduces principal payout, if ended before maturity
         _stake.isActive = 0;                                      // deactivate
 
           // keep track of the user's REX in active stakes
@@ -842,16 +852,28 @@ abstract contract StakingToken is Snapshot {
         _removeScheduledShares(_stake.finalDay, _stake.stakesShares);
 
           // distribute penalties to all stakers
-          // (if stake was ended earlier than 50% of its intended duration)
+          // (if stake was ended before maturity)
         if (_stake.penaltyAmount > 0) {
             totalPenalties[_stake.closeDay] = totalPenalties[_stake.closeDay].add(_stake.penaltyAmount);
+        }
+
+          // When calculating the SharePrice-Update, given bonuses (TREX/IRR) must be calculated backwards
+          // otherwise the SharePrice would rise more than needed
+          // also, use the initialShares of the stake, not the (possibly) deducted value in _stake.stakesShares
+
+        uint256 stakesSharesCorr = (_stake.isIrrTrex == 2 || _stake.isIrrTrex == 3)   // IF TREX, calculate back the TREX bonus
+            ? initialShares[msg.sender][_stakeID].mul(80).div(100)
+            : initialShares[msg.sender][_stakeID];
+
+        if (_stake.isIrrTrex == 1 || _stake.isIrrTrex == 3) {                         // IF IRREVOCABLE, calculate back the bonus
+            stakesSharesCorr = stakesSharesCorr.mul(80).div(100);
         }
 
         _sharePriceUpdate(
             _stake.stakedAmount > _stake.penaltyAmount ? _stake.stakedAmount - _stake.penaltyAmount : 0,
             _stake.rewardAmount + withdraws[msg.sender][_stakeID],
             _stake.stakingDays,
-            _stake.stakesShares
+            stakesSharesCorr
         );
 
         emit StakeEnded(
@@ -915,8 +937,8 @@ abstract contract StakingToken is Snapshot {
             if (newSharePrice > globals.sharePrice) {
 
                 newSharePrice =
-                    newSharePrice < globals.sharePrice.mul(102).div(100) ?
-                    newSharePrice : globals.sharePrice.mul(102).div(100);
+                    newSharePrice < globals.sharePrice.mul(105).div(100) ?
+                    newSharePrice : globals.sharePrice.mul(105).div(100);
 
                 emit NewSharePrice(
                     newSharePrice,
@@ -939,7 +961,9 @@ abstract contract StakingToken is Snapshot {
         returns (uint256)
     {
         return _tokenAmount
+            .mul(PRECISION_RATE)
             .mul( SHARES_PRECISION + _getBonus(_stakingDays) )
+            .div(SHARES_PRECISION)
             .div(_stakeShares);
     }
 
@@ -999,14 +1023,15 @@ abstract contract StakingToken is Snapshot {
     {
         Stake memory stake = stakes[_staker][_stakeID];
 
-        if (stake.isActive == 0) { return (0, stake.rewardAmount, 0); }         // ended stake - return saved rewardAmount
+        if (stake.isActive == 0) { return (0, stake.rewardAmount, 0); }        // ended stake - return saved rewardAmount
         if (stake.startDay > _currentRxDay()) { return (0, 0, 0); }            // stake not started - return 0
         if (stake.isActive == 3 || stake.isActive == 4) { return (0, 0, 0); }  // stake transferred or sold - return 0
 
         if (_currentRxDay() >= stake.finalDay)
         {
-            // the stake is ACTIVE (or still OFFERED on DEX) and mature - calculate rewards for ALL past days and deduct LATE penalty on rewards (if applicable)
-            // Withdrawing rewards is not possible, so there no penalties for shares
+            // the stake is ACTIVE (or still OFFERED on DEX) and MATURE - calculate rewards for ALL past days and deduct LATE penalty on rewards (if applicable)
+            // Withdrawing rewards is not possible at this point, so there are no penalties for shares
+            // if rewards have been withdrawn before, this is regarded by using _startingDay(stake)
 
             uint32 _finalDay = _calculationDay(stake);
 
@@ -1016,7 +1041,7 @@ abstract contract StakingToken is Snapshot {
                 _finalDay
             );
 
-              // LATE CLAIM: deduct penalty of 1%/week, if claimed more than 14 days after finalDay
+              // LATE CLAIM: deduct REWARDS penalty of 1%/week, if claimed more than 14 days after finalDay
             if (_currentRxDay() > (_finalDay + uint32(14)) && rewardAmount > 0) {
                 uint256 _reductionPercent = ((uint256(_currentRxDay()) - uint256(_finalDay) - uint256(14)) / uint256(7)) + uint256(1);
                 if (_reductionPercent > 100) { _reductionPercent = 100; }
@@ -1028,7 +1053,7 @@ abstract contract StakingToken is Snapshot {
         }
         else
         {
-            // by now, the stake must be ACTIVE or OFFERED on DEX, already started and not mature:
+            // now, the stake must be ACTIVE or OFFERED on DEX, already started and not mature:
             // calculate the withdrawable rewardAmount and the sharesPenalty that would be deducted
 
             _withdrawDay = _withdrawDays > 0               // startingDay returns stake.startDay OR stake.withdrawDay (if withdrawn already)
@@ -1051,13 +1076,15 @@ abstract contract StakingToken is Snapshot {
             );
 
               // calculate penalty - shares that would be deducted (if there are any rewards)
+              // this part is only for REVOCABLE STAKES when rewards are being withdrawn
+              // deduct the shares, that the user would get, when creating a new stake for the remaining days (@ current SharePrice)
+
             if (rewardAmount > 0)
             {
-                uint32 remainingDays = _daysLeft(stake);
                 sharesPenalty = _stakesShares(
                     rewardAmount,
-                    remainingDays,
-                    stake.isIrrTrex == 3 ? globals.sharePrice.mul(70).div(100) : globals.sharePrice.mul(95).div(100)
+                    _daysLeft(stake),
+                    stake.isIrrTrex == 2 ? globals.sharePrice.mul(80).div(100) : globals.sharePrice
                 );
             }
             else
@@ -1086,7 +1113,8 @@ abstract contract StakingToken is Snapshot {
 
     /**
     * @notice A private function used to calculate penalties on a REX PRINCIPAL for ACTIVE STAKES and OFFERED STAKES
-    * If stake is served 50%: no penalty, otherwise linear from 100% (day 1) to 0% (day x/2 of x)
+    * If stake has not started or fully served, no penalty => (_stakeNotStarted(_stake) || _daysLeft(_stake) == 0)
+    * Otherwise linear from day 1 (90% penalty) to last day before maturity (10% penalty)
     * @param _stake unique bytes sequence reference to the stake
     */
     function _calculatePenaltyAmount(
@@ -1096,11 +1124,8 @@ abstract contract StakingToken is Snapshot {
         view
         returns (uint256)
     {
-        return _stakeNotStarted(_stake) ? 0 : (
-            ((_stake.stakingDays - _daysLeft(_stake)) >= (_stake.stakingDays / 2)) ? 0 : (
-                _stake.stakedAmount - ( ( _stake.stakedAmount * (_stake.stakingDays - _daysLeft(_stake)) ) / (_stake.stakingDays / 2) )
-            )
-        );
+        return ( _stakeNotStarted(_stake) || _daysLeft(_stake) == 0 ) ? 0 :
+            ( _stake.stakedAmount * (100 + (800 * (_daysLeft(_stake) - 1) / (_stake.stakingDays - 1) ) ) / 1000 );
     }
 
     function _loopRewardAmount(
@@ -1125,8 +1150,8 @@ abstract contract ExtendedStaking is StakingToken {
     using SafeMath32 for uint32;
 
     /**
-    * @notice A function for a staker to transfer an active stake,
-    * belonging to his address by providing the stake ID, to another address.
+    * @notice A function for a staker (not a contract) to transfer an active stake,
+    * belonging to his address by providing the stake ID, to another address (not a contract).
     * Not possible if staking rewards have been withdrawn before.
     * @param _stakeID unique bytes sequence reference to the stake
     * @param _toAddress Receiver of the stake
@@ -1137,11 +1162,13 @@ abstract contract ExtendedStaking is StakingToken {
     )
         external
     {
+        require(_notContract(msg.sender) && msg.sender == tx.origin, 'REX: Not an address');
+
         _dailySnapshotPoint(_currentRxDay());
 
         require(stakes[msg.sender][_stakeID].isActive == 1, 'RX: 7');
         require(stakes[msg.sender][_stakeID].withdrawDay == 0, 'RX: 8');
-        require(_toAddress != msg.sender, 'RX: 9');
+        require(_toAddress != msg.sender && _notContract(_toAddress), 'RX: 9');
 
         Stake memory _temp = stakes[msg.sender][_stakeID];
         Stake memory _newStake;
@@ -1249,9 +1276,9 @@ abstract contract ExtendedStaking is StakingToken {
     }
 
     /**
-    * @notice allows to withdraw staking rewards from active stake
+    * @notice allows a staker (not a contract) to withdraw staking rewards from active stake
     * @param _stakeID unique bytes sequence reference to the stake
-    * @param _withdrawDays amount of days to process, all = 0
+    * @param _withdrawDays number of days to process (from the beginning / last withdraw day), all possible days = 0
     */
     function withdrawRewards(
         bytes16 _stakeID,
@@ -1266,9 +1293,10 @@ abstract contract ExtendedStaking is StakingToken {
     {
         _dailySnapshotPoint(_currentRxDay());
 
-        require(stakes[msg.sender][_stakeID].isActive == 1, 'RX: 16');               // only if stake is active
-        require(stakes[msg.sender][_stakeID].finalDay > _currentRxDay(), 'RX: 17');  // only if stake is immature
+        require(stakes[msg.sender][_stakeID].isActive == 1, 'RX: 16');                // only if stake is active
         require(stakes[msg.sender][_stakeID].isIrrTrex == 0 || stakes[msg.sender][_stakeID].isIrrTrex == 2, 'RX: 18'); // not possible for irrevocable stakes
+        require(_currentRxDay() > stakes[msg.sender][_stakeID].startDay, 'RX: 17');   // stake must have passed the first active day, or there are no rewards to withdraw
+        require(stakes[msg.sender][_stakeID].finalDay > _currentRxDay(), 'RX: 17a');  // only if stake is immature
 
         Stake memory stake = stakes[msg.sender][_stakeID];  // get stake
 
@@ -1282,21 +1310,9 @@ abstract contract ExtendedStaking is StakingToken {
             stake.stakesShares > stakersPenalty ?
             stake.stakesShares.sub(stakersPenalty) : 0;
 
-          // keep track of the scheduled shares: deduct from final day
-        _removeScheduledShares(
-            stake.finalDay,
-            stakersPenalty > _sharesTemp ? _sharesTemp : stakersPenalty
-        );
-
-          // log globals
+          // keep track of the scheduled shares: deduct from final day - then log globals
+        _removeScheduledShares(stake.finalDay, stakersPenalty > _sharesTemp ? _sharesTemp : stakersPenalty);
         _decreaseGlobals(0, _sharesTemp > stakersPenalty ? stakersPenalty : _sharesTemp);
-
-        _sharePriceUpdate(
-            stake.stakedAmount,
-            withdrawAmount,
-            stake.stakingDays,
-            stake.stakesShares
-        );
 
           // keep track of withdraws for sharePriceUpdate when calling _endStake
         withdraws[msg.sender][_stakeID] = withdraws[msg.sender][_stakeID].add(withdrawAmount);
@@ -1316,7 +1332,7 @@ abstract contract DexToken is ExtendedStaking {
     using SafeMath32 for uint32;
 
     /**
-    * @notice A function for a staker to offer an active stake on the REX STAKES DEX
+    * @notice A function for a staker (not a contract) to offer an active stake on the REX STAKES DEX
     * Requirements: Listing duration is between 1 and 30 days.
     * Not possible if rewards have been withdrawn before.
     * @param _stakeID unique bytes sequence reference to the stake
