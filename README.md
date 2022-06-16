@@ -1,6 +1,6 @@
-# rex-2-bsc-source-c (CertiK and Solidity.Finance)
+# rex-2-bsc-source-c ( FOR: CertiK and Solidity.Finance)
 
-This document provides a quick overview about the contracts and tokens and their functionality.
+
 
 # LATEST CHANGES 
 
@@ -12,10 +12,13 @@ to prevent from the contract failing to addLiquidity to PancakeSwap (remainder v
 2.
 Updated the comments sections in the beginning of the contracts
 
+3.
+New website online: rex.io
+
+
 ****
 
-Read the whitepaper (REXpaper) for details (15 min)
-https://internet-bonds.com/paper
+The whitepaper has been updated with the details. https://rex.io/paper
 
 ****
 
