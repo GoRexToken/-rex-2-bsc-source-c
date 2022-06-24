@@ -2,7 +2,7 @@
 
 
 
-# LATEST CHANGES 
+# LATEST CHANGES --> v3.0 BSC mainnet (exact matches for deployment)
 
 1.
 AUCTIONS / RDA contract:
