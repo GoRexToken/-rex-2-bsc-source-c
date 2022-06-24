@@ -201,8 +201,8 @@ contract RexDailyAuction {
     IUniswapV2Router02 public constant UNISWAP_ROUTER = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
     address constant mrex_address = 0x76837D56D1105bb493CDDbEFeDDf136e7c34f0c4;
     address constant busd_address = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
-    address constant MARKETING_ADDR = 0x781A97D39Cb6dDb9212fcaB3AEF8d63bD0A6fEbD;
-    address constant DEVELOPMENT_ADDR = 0x4611f8621C8f7B8Cfa97A2101d1c2B41d65aE994;
+    address constant MARKETING_ADDR = 0x231f8084fECEee5b90021C42C083FEB73d4182F9;
+    address constant DEVELOPMENT_ADDR = 0xF3393b11Dc4CADFDc5BCed0F7BEB9d09Ce5C78D6;
 
     uint32 constant DONATION_DAYS = 222;
     uint32 constant LAST_CLAIM_DAY = 250;       // DONATION_DAYS + 28
