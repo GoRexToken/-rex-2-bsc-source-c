@@ -1,4 +1,33 @@
-# rex-2-bsc-source-c ( FOR: CertiK and Solidity.Finance)
+# rex-2-bsc-source-c ( FOR: CertiK and Solidity.Finance and TechRate)
+
+
+****************************************************
+******* EDIT (2022, Sept. 16 == REX DAY 77): *******
+
+ABOUT THE REX SOFTWARE - a little bit of background information for the interested reader.
+Right before the deployment of the REX software on the "Binance Smart Chain" (BNBChain) blockchain, some Crypto experienced users required the REX team NOT to publish the REX software. The users publicly expressed concern that the REX software (and any inventions contained within) would be copied.
+To prevent from being copied and to gain trust in the software nonetheless, the team and auditors have tried to prove that the AUDITED REX code (in this repository) matches the DEPLOYED code. For details please find the communication below.
+Anyways, to make it short, it was technically NOT possible to prove this and and that could create uncertainty among new investors.
+As this uncertainty is no longer justifiable, the team has decided to publish all the code and make it available to the general public.
+This necessary step provides FULL transparency about all software details and shall finally convince people who doubted the code.
+The REX team hereby invites the whole Crypto and DeFi community to do their own research on the REX software and explore it in-depth.
+REX is - and has always been - fully decentralized and unchangeable software that everyone may use at will.
+Thank you very much for taking the time to read this and for your trust in the REX software and team.
+Yours, 
+The REX team
+
+ABOUT REX
+The blockchain and crypto market, which is still very young, is experiencing great popularity, which is reflected in regular wave-like upswings. A trillion dollar market where users can trade directly, without banks and institutions and restrictions. All you need is internet access and a mobile phone.
+Today there is a variety of products for everyone on the blockchain that are also available in traditional finance: short-term high-risk investments, but also long-term, safer investment options. Among the long-term options, the so-called "staking" enjoys great popularity.
+STAKING works like a Certificate of Deposit, where the user locks their tokens up for a desired duration and earns rewards in return. Essentially, you can think of this as a next-generation savings account, but with much higher rewards than traditional finance and with vastly improved flexibility.
+An example of such decentralized blockchain-based software that mimics Certificates of Deposit (CD) is REX ("XRX").
+Unlike traditional CD products, which are offered, managed and controlled by banks and institutions, users interact directly with the REX software, at will, and experience no restrictions of any kind. The software is fully decentralized on the blockchain and it is forever unchangeable. In REX there is no owner and no administrator who can influence or switch off the software. So no trust in people is necessary, only trust in the software. In order to ensure the correct and long-term functioning of the software in the best possible way, the software was independently audited by three market-leading and well-known auditing companies. All code and audit reports are published and available to the general public.
+With its newly developed functions, the REX software offers users unrivaled flexibility and a plethora of methods to manage their stakes/deposits. The most important invention that REX has brought forth and integrated is the possibility that, for the first time in Decentralized Finance, active Certificates of Deposits can be traded in a decentralized manner (the STAKE DEX). This makes a stake/deposit its own cryptocurrency and offers users unprecedented new experiences in asset management.
+The rex.io website, the detailed whitepaper and numerous explanatory videos guide the user through the possibilities that smart contracts have in store for them. 
+REX is crypto for the people.
+
+******************* End of EDIT  *******************
+****************************************************
 
 
 Dear Auditors, 
@@ -36,7 +65,7 @@ THANK YOU SO MUCH!
 Please find the mainnet deployment details below.
 
 Best regards
-Yonko
+REX team
 
 [Source of this text: https://github.com/GoRexToken/-rex-2-bsc-source-c/edit/finalcommit/README.md]
 
@@ -46,7 +75,7 @@ Yonko
 + REX MAINNET (BSC)
 
 + LAUNCH 1656608400
-+ DAY 0 = Thu Jun 30 2022 17:00:00 GMT+0000 (AUCTIONS start +1 day = 1656694800) // 18:00 LONDON - 12:00 CAYMAN ISLANDS
++ DAY 0 = Thu Jun 30 2022 17:00:00 GMT+0000 (AUCTIONS start +1 day = 1656694800) // 18:00 LONDON 
 
 + REX 0xb25583E5e2dB32b7FCbffe3f5e8E305C36157E54
 + revokeAccess() https://bscscan.com/tx/0x91a2332906a3dcc3dc54da85fb1403b355e6a2641bb7756b07909141c54bd22f
@@ -72,9 +101,7 @@ Yonko
 
 ****
 
-Dev: YONKO
-+ Dev contact person: Thomas Rexroth
-+ TG: https://t.me/Thomas_REX_ROTH
++ Dev contact person: Thomas
 + E-mail: go@rex-token.com
 
 ****
@@ -99,9 +126,6 @@ AIRDROP 0x5979012039E72779cA4992e53DfB38F07018C6a1
 
 COMPENSATION 0x18366969bf6C324Edc0076C9833A1a680909378F
 
-MARKETING-FUND 0x7D0Eea6f05535890Cd515190618222fd72fE735A
-
-DEV-FUND 0xa66d267B19332dA0A6054Ac9F284b8716c864F84
 
 ----
 
