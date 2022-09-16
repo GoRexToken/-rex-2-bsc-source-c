@@ -4,7 +4,8 @@
 ****************************************************
 ******* EDIT (2022, Sept. 16 == REX DAY 77): *******
 
-ABOUT THE REX SOFTWARE - a little bit of background information for the interested reader.
+# ABOUT THE REX SOFTWARE - a little bit of background information for the interested reader.
+
 Right before the deployment of the REX software on the "Binance Smart Chain" (BNBChain) blockchain, some Crypto experienced users required the REX team NOT to publish the REX software. The users publicly expressed concern that the REX software (and any inventions contained within) would be copied.
 To prevent from being copied and to gain trust in the software nonetheless, the team and auditors have tried to prove that the AUDITED REX code (in this repository) matches the DEPLOYED code. For details please find the communication below.
 Anyways, to make it short, it was technically NOT possible to prove this and and that could create uncertainty among new investors.
@@ -16,7 +17,9 @@ Thank you very much for taking the time to read this and for your trust in the R
 Yours, 
 The REX team
 
-ABOUT REX
+
+# ABOUT REX
+
 The blockchain and crypto market, which is still very young, is experiencing great popularity, which is reflected in regular wave-like upswings. A trillion dollar market where users can trade directly, without banks and institutions and restrictions. All you need is internet access and a mobile phone.
 Today there is a variety of products for everyone on the blockchain that are also available in traditional finance: short-term high-risk investments, but also long-term, safer investment options. Among the long-term options, the so-called "staking" enjoys great popularity.
 STAKING works like a Certificate of Deposit, where the user locks their tokens up for a desired duration and earns rewards in return. Essentially, you can think of this as a next-generation savings account, but with much higher rewards than traditional finance and with vastly improved flexibility.
